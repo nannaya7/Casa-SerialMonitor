@@ -79,7 +79,6 @@ class CasaSerialWindow(QMainWindow):
         self._on_send_format_changed()
 
         self.refresh_ports(show_status=True)
-        self._create_port_scan_timer()
 
     def _load_main_window_ui(self) -> None:
         """Load the Qt Designer layout and bind named widgets to this window."""
@@ -517,13 +516,6 @@ class CasaSerialWindow(QMainWindow):
             self.tx_status_label,
         ):
             status_bar.addPermanentWidget(label)
-
-    def _create_port_scan_timer(self) -> None:
-        self.port_scan_timer = QTimer(self)
-        self.port_scan_timer.setObjectName("port_scan_timer")
-        self.port_scan_timer.setInterval(2000)
-        self.port_scan_timer.timeout.connect(lambda: self.refresh_ports(show_status=False))
-        self.port_scan_timer.start()
 
     def _create_loop_send_timer(self) -> None:
         self.loop_send_timer = QTimer(self)
