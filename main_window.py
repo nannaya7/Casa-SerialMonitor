@@ -299,14 +299,29 @@ class CasaSerialWindow(QMainWindow):
     _CMD_BTN_STYLE = """
         QPushButton {
             color: #3a2b1f;
-            font-weight: 500;
-            text-align: left;
-            border: none;
-            padding: 2px 0;
-            min-height: 34px;
+            font-weight: 600;
+            background: #f3e7da;
+            border: 1px solid #d9c1aa;
+            border-radius: 8px;
+            padding: 2px 8px;
+            min-height: 32px;
         }
-        QPushButton:hover { color: #8a5d33; }
-        QPushButton:pressed { color: #a87443; }
+        QPushButton:hover {
+            background: #ead8c4;
+            border-color: #b98552;
+            color: #6b4423;
+        }
+        QPushButton:pressed {
+            background: #d9bfa3;
+            border-color: #a87443;
+            padding-top: 4px;
+            padding-bottom: 0;
+        }
+        QPushButton:disabled {
+            color: #a89886;
+            background: #f7f1ea;
+            border-color: #e6d9cc;
+        }
     """
 
     def _append_cmd_row(self, i: int) -> None:

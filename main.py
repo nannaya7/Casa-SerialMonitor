@@ -6,6 +6,7 @@ import ctypes
 from pathlib import Path
 import sys
 
+from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QFont, QFontDatabase, QIcon
 from PyQt6.QtWidgets import QApplication
 
@@ -32,6 +33,8 @@ def main() -> int:
 
     window = CasaSerialWindow()
     window.show()
+    # 시작 직후 이벤트 루프에서 New Session 창을 하나 띄운다.
+    QTimer.singleShot(0, window.new_session_action.trigger)
 
     return app.exec()
 

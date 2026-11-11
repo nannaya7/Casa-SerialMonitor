@@ -886,6 +886,91 @@
 
 ---
 
+## 2026-11-11 - README.md 작성 및 작업 기록 규칙 추가
+
+변경 파일:
+
+- `README.md`
+- `CLAUDE.md`
+- `History.md`
+
+핵심 변경 사항:
+
+- 비어 있던 `README.md`를 프로젝트 소개, 주요 기능, 설치/실행, 빌드, 파일 구조, 문서 안내 순으로 작성했다.
+- `CLAUDE.md`에 `History.md` 지속 기록 규칙을 추가했다.
+
+검증 결과:
+
+- 문서 작업이라 코드 검증은 해당 없음.
+
+## 2026-11-11 - run.bat 터미널 창 숨김
+
+변경 파일:
+
+- `run.bat`
+- `History.md`
+
+핵심 변경 사항:
+
+- 기본 실행을 `pythonw`(`.venv`가 있으면 `.venv\Scripts\pythonw.exe`) + `start ""` 방식으로 바꿔 앱 실행 시 터미널 창이 남지 않게 했다.
+- 오류 확인이 필요할 때를 위해 `run.bat --console` 옵션(기존 콘솔 실행 및 오류 시 pause)을 추가했다.
+- `--check`에서 pythonw 경로도 출력하도록 했다.
+
+검증 결과:
+
+- `run.bat --check` 정상 출력 확인. GUI 실행은 직접 확인 필요.
+
+## 2026-11-11 - 시작 시 New Session 창 자동 표시
+
+변경 파일:
+
+- `main.py`
+- `History.md`
+
+핵심 변경 사항:
+
+- 앱 시작 직후 `QTimer.singleShot(0, ...)`로 `new_session_action`을 실행해 New Session 다이얼로그가 자동으로 뜨게 했다.
+- 다이얼로그를 취소하면 세션 없이 메인 창만 남는다.
+
+검증 결과:
+
+- `python -m py_compile main.py` 통과
+- 오프스크린 실행 시 시작 직후 New Session 다이얼로그 `exec()` 호출 확인
+
+## 2026-11-11 - CMD 패널 버튼 모양 개선
+
+변경 파일:
+
+- `main_window.py`
+- `UI/mainWindow.ui`
+- `History.md`
+
+핵심 변경 사항:
+
+- CMD00~ 버튼이 텍스트처럼 보이던 문제를 고쳤다. `_CMD_BTN_STYLE`에 배경(`#f3e7da`), 테두리(`#d9c1aa`), 둥근 모서리(8px), 중앙 정렬 텍스트를 적용했다.
+- hover / pressed / disabled 상태 스타일을 추가했다.
+- `.ui`의 `cmd_button_00~09`에 설정돼 있던 `flat=true`를 `false`로 변경했다.
+- 동적으로 추가되는 CMD 행도 같은 스타일을 사용한다.
+
+검증 결과:
+
+- 오프스크린 렌더링으로 버튼 배경/테두리/둥근 모서리 적용 확인 (폰트가 없는 환경이라 글자는 박스로 표시됨).
+
+## 2026-11-11 - CMD 패널 헤더에 "명령어 전송" 추가
+
+변경 파일:
+
+- `UI/mainWindow.ui`
+- `History.md`
+
+핵심 변경 사항:
+
+- CMD 버튼 열(row 0, column 0) 위에 `cmd_header_send` 라벨("명령어 전송")을 추가했다. 다른 헤더(포트명/HEX/CR+LF)와 같은 스타일(8pt, `#7b6755`, 가운데 정렬)을 사용한다.
+
+검증 결과:
+
+- 오프스크린 렌더링으로 헤더 위치 확인.
+
 ## 나중에 할 일
 
 ### 파일 송신 기능
