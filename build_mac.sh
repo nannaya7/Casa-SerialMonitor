@@ -62,5 +62,13 @@ iconutil -c icns "$ICONSET_DIR" -o "$ICON_ICNS"
   --specpath "$SPEC_DIR" \
   main.py
 
+# macOS는 블루투스를 쓰는 앱에 사용 목적 문구(Info.plist)를 요구한다. 없으면 BLE 접근 시 앱이 종료된다.
+INFO_PLIST="$DIST_DIR/$APP_NAME.app/Contents/Info.plist"
+BT_TEXT="CasaSerial은 블루투스 장치(Nordic UART Service)에 연결하기 위해 블루투스를 사용합니다."
+/usr/libexec/PlistBuddy -c "Delete :NSBluetoothAlwaysUsageDescription" "$INFO_PLIST" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Add :NSBluetoothAlwaysUsageDescription string $BT_TEXT" "$INFO_PLIST"
+# Info.plist를 수정하면 서명이 깨지므로 ad-hoc 재서명한다.
+codesign --force --deep --sign - "$DIST_DIR/$APP_NAME.app"
+
 echo
 echo "Build complete: $DIST_DIR/$APP_NAME.app"

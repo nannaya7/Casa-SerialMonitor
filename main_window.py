@@ -5,10 +5,18 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 import re
+from urllib.parse import quote
 
 from PyQt6 import uic
-from PyQt6.QtCore import QRegularExpression, QSize, QTimer, Qt
-from PyQt6.QtGui import QCloseEvent, QColor, QIcon, QRegularExpressionValidator
+from PyQt6.QtCore import QPoint, QRegularExpression, QSettings, QSize, QTimer, Qt
+from PyQt6.QtGui import (
+    QAction,
+    QCloseEvent,
+    QColor,
+    QIcon,
+    QKeySequence,
+    QRegularExpressionValidator,
+)
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -32,9 +40,10 @@ from app_resources import (
     MAIN_WINDOW_UI_RELATIVE_PATH,
     resource_path,
 )
+from ble_scan_dialog import BleScanDialog
 from monitor_subwindow import MonitorSubWindow
 from new_session_dialog import NewSessionDialog
-from settings import SerialSettings
+from settings import BleSettings, SerialSettings
 
 
 # ---------------------------------------------------------------------------
@@ -58,6 +67,10 @@ class CasaSerialWindow(QMainWindow):
         self._create_loop_send_timer()
 
         self.new_session_action.triggered.connect(self._open_new_session_dialog)
+        self.close_session_action = QAction("세션 닫기", self)
+        self.close_session_action.setShortcut(QKeySequence("Ctrl+W"))
+        self.close_session_action.triggered.connect(self.mdi_area.closeActiveSubWindow)
+        self.session_menu.addAction(self.close_session_action)
         self.save_action.triggered.connect(self._save_active_received_data)
         self.refresh_ports_action.triggered.connect(
             lambda: self.refresh_ports(show_status=True, force=True)
@@ -144,6 +157,31 @@ class CasaSerialWindow(QMainWindow):
         )
         self.main_toolbar.addWidget(self.refresh_ports_button)
 
+        self.ble_button = QPushButton("블루투스 스캔", self.main_toolbar)
+        self.ble_button.setObjectName("ble_button")
+        self.ble_button.setFixedSize(150, 58)
+        self.ble_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.ble_button.setStyleSheet(
+            """
+            QPushButton#ble_button {
+                color: #3a2b1f;
+                background: #fffefa;
+                border: 1px solid #e6d9cc;
+                border-radius: 14px;
+                padding: 0 12px;
+            }
+            QPushButton#ble_button:hover {
+                background: #f3e7da;
+                border-color: #d9c1aa;
+            }
+            QPushButton#ble_button:pressed {
+                background: #ead8c4;
+            }
+            """
+        )
+        self.ble_button.clicked.connect(self._on_ble_button_clicked)
+        self.main_toolbar.addWidget(self.ble_button)
+
         for combo in (
             self.port_combo,
             self.baudrate_combo,
@@ -228,6 +266,7 @@ class CasaSerialWindow(QMainWindow):
         self.cmd_toggle_btn.clicked.connect(self._toggle_cmd_panel)
 
         self._cmd_formatting = False
+        self._cmd_key: str | None = None  # CMD 전송 데이터를 저장 중인 연결 대상(포트/장치) 키
         self._cmd_entries: list[tuple[QLineEdit, QCheckBox, QCheckBox]] = []
         self._cmd_buttons: list[QPushButton] = []
         for i in range(10):
@@ -236,6 +275,7 @@ class CasaSerialWindow(QMainWindow):
             bin_cb = getattr(self, f"cmd_bin_{i:02d}")
             crlf_cb = getattr(self, f"cmd_crlf_{i:02d}")
             btn.setStyleSheet(self._CMD_BTN_STYLE)
+            btn.setToolTip(f"{i:02d}번 전송 데이터 보내기")
             inp.setMinimumHeight(34)
             btn.clicked.connect(lambda _checked=False, idx=i: self._send_cmd(idx))
             bin_cb.toggled.connect(
@@ -247,6 +287,7 @@ class CasaSerialWindow(QMainWindow):
             self._cmd_buttons.append(btn)
             self._cmd_entries.append((inp, bin_cb, crlf_cb))
         self._update_cmd_pm_buttons()
+        self._sync_ble_button()
 
     # -- shared UI helpers ---------------------------------------------------
 
@@ -325,9 +366,10 @@ class CasaSerialWindow(QMainWindow):
 
     def _append_cmd_row(self, i: int) -> None:
         r = i + 1
-        btn = QPushButton(f"CMD{i:02d}", self.cmd_content)
+        btn = QPushButton("SEND", self.cmd_content)
         btn.setFlat(True)
         btn.setStyleSheet(self._CMD_BTN_STYLE)
+        btn.setToolTip(f"{i:02d}번 전송 데이터 보내기")
         btn.clicked.connect(lambda _, idx=i: self._send_cmd(idx))
         inp = QLineEdit(self.cmd_content)
         inp.setMinimumHeight(34)
@@ -460,6 +502,84 @@ class CasaSerialWindow(QMainWindow):
                 return index + 1
         return len(text)
 
+    # -- command entry persistence -----------------------------------------
+
+    @staticmethod
+    def _app_settings() -> QSettings:
+        return QSettings("CasaSerial", "CasaSerial")
+
+    @staticmethod
+    def _cmd_settings_group(key: str) -> str:
+        # 포트 경로(/dev/cu...)나 장치 이름에 들어 있는 '/' 등이 설정 경로로 해석되지 않게 인코딩한다.
+        return "cmd_targets/" + quote(key, safe="")
+
+    def _save_cmd_entries(self) -> None:
+        """Save the CMD panel under the current connection target (no-op without one)."""
+        if self._cmd_key is None:
+            return
+        settings = self._app_settings()
+        settings.beginWriteArray(self._cmd_settings_group(self._cmd_key))
+        for i, (inp, hex_cb, crlf_cb) in enumerate(self._cmd_entries):
+            settings.setArrayIndex(i)
+            settings.setValue("text", inp.text())
+            settings.setValue("hex", hex_cb.isChecked())
+            settings.setValue("crlf", crlf_cb.isChecked())
+        settings.endArray()
+        settings.sync()
+
+    def _load_cmd_entries(self, key: str) -> None:
+        """Show the CMD data saved for `key`; a target with nothing saved starts blank."""
+        settings = self._app_settings()
+        count = settings.beginReadArray(self._cmd_settings_group(key))
+        rows = []
+        for i in range(count):
+            settings.setArrayIndex(i)
+            rows.append(
+                (
+                    str(settings.value("text", "")),
+                    settings.value("hex", False, type=bool),
+                    settings.value("crlf", False, type=bool),
+                )
+            )
+        settings.endArray()
+        self._apply_cmd_rows(rows)
+
+    def _apply_cmd_rows(self, rows: list[tuple[str, bool, bool]]) -> None:
+        wanted = max(1, min(len(rows), 20)) if rows else 10
+        while len(self._cmd_entries) < wanted:
+            self._append_cmd_row(len(self._cmd_entries))
+        while len(self._cmd_entries) > wanted:
+            self._remove_cmd_row()
+        self._update_cmd_pm_buttons()
+
+        self._cmd_formatting = True
+        try:
+            for index, (inp, hex_cb, crlf_cb) in enumerate(self._cmd_entries):
+                text, is_hex, is_crlf = rows[index] if index < len(rows) else ("", False, False)
+                if is_hex:
+                    inp.setValidator(
+                        QRegularExpressionValidator(
+                            QRegularExpression(r"[0-9A-Fa-f ]*"), inp
+                        )
+                    )
+                else:
+                    inp.setValidator(None)
+                inp.setText(text)
+                hex_cb.setChecked(is_hex)
+                crlf_cb.setChecked(is_crlf)
+        finally:
+            self._cmd_formatting = False
+
+    def _sync_cmd_target(self) -> None:
+        """Switch the CMD panel to the active session's connection target."""
+        sub = self._active_subwindow()
+        key = sub.cmd_key if sub is not None else None
+        if key is None or key == self._cmd_key:
+            return
+        self._save_cmd_entries()  # 이전 대상의 내용을 먼저 저장
+        self._cmd_key = key
+        self._load_cmd_entries(key)
+
     def _send_cmd(self, idx: int) -> None:
         inp, bin_cb, crlf_cb = self._cmd_entries[idx]
         text = inp.text().strip()
@@ -475,7 +595,7 @@ class CasaSerialWindow(QMainWindow):
             try:
                 payload = bytes.fromhex(text.replace(" ", ""))
             except ValueError:
-                self._show_send_error(f"CMD{idx}: 올바른 HEX 값이 아닙니다.")
+                self._show_send_error(f"SEND {idx:02d}: 올바른 HEX 값이 아닙니다.")
                 return
         else:
             payload = text.encode("utf-8")
@@ -485,6 +605,7 @@ class CasaSerialWindow(QMainWindow):
 
         if sub.write_data(payload):
             sub.append_log("TX", self._format_payload_for_log(payload))
+            self._save_cmd_entries()
 
     def _create_status_bar(self) -> None:
         status_bar = self.statusBar()
@@ -601,6 +722,7 @@ class CasaSerialWindow(QMainWindow):
     # -- subwindow state callbacks ------------------------------------------
 
     def _on_active_subwindow_changed(self, sub: QMdiSubWindow | None) -> None:
+        self._sync_cmd_target()
         if not isinstance(sub, MonitorSubWindow):
             self.connection_status_label.setText("연결 해제됨")
             self.port_status_label.setText("포트: -")
@@ -618,6 +740,7 @@ class CasaSerialWindow(QMainWindow):
     def _on_subwindow_state_changed(self, sub: MonitorSubWindow) -> None:
         if sub is not self._active_subwindow():
             return
+        self._sync_cmd_target()
         self._refresh_ui_from_subwindow(sub)
 
     def _on_subwindow_error(self, sub: MonitorSubWindow, message: str) -> None:
@@ -708,18 +831,10 @@ class CasaSerialWindow(QMainWindow):
             self.statusBar().showMessage(f"열기 실패: {exc}", 5000)
             return
 
-        sub = MonitorSubWindow(Path(path).name, dump_mode=False, parent=self)
-        sub.log_format = self.log_format_combo.currentText()
-        sub.timestamp_enabled = self.timestamp_checkbox.isChecked()
-        sub.state_changed.connect(self._on_subwindow_state_changed)
-        sub.error_occurred.connect(self._on_subwindow_error)
-        sub.bytes_sent.connect(self._on_subwindow_bytes_sent)
+        target = self._window_for_new_session()
+        sub = target._create_monitor_subwindow(Path(path).name, dump_mode=False)
         sub.load_received_data(data, title=Path(path).name)
-
-        self.mdi_area.addSubWindow(sub)
-        sub.show()
-        self.mdi_area.setActiveSubWindow(sub)
-        self.statusBar().showMessage(f"열기 완료: {path}", 5000)
+        target.statusBar().showMessage(f"열기 완료: {path}", 5000)
 
     @staticmethod
     def _format_hex_file(data: bytes) -> str:
@@ -745,6 +860,91 @@ class CasaSerialWindow(QMainWindow):
 
     # -- New Session dialog / subwindow creation ----------------------------
 
+    def _create_monitor_subwindow(
+        self, title: str, dump_mode: bool, cmd_key: str | None = None
+    ) -> MonitorSubWindow:
+        sub = MonitorSubWindow(title, dump_mode=dump_mode, parent=self)
+        sub.initial_cmd_key = cmd_key
+        sub.log_format = self.log_format_combo.currentText()
+        sub.timestamp_enabled = self.timestamp_checkbox.isChecked()
+        sub.state_changed.connect(self._on_subwindow_state_changed)
+        sub.state_changed.connect(lambda _sub: self._sync_ble_button())
+        sub.destroyed.connect(lambda *_: QTimer.singleShot(0, self._sync_ble_button))
+        sub.error_occurred.connect(self._on_subwindow_error)
+        sub.bytes_sent.connect(self._on_subwindow_bytes_sent)
+
+        self.mdi_area.addSubWindow(sub)
+        sub.showMaximized()  # 세션은 항상 창을 꽉 채워서 연다.
+        self.mdi_area.setActiveSubWindow(sub)
+        return sub
+
+    # -- separate top-level windows -----------------------------------------
+
+    # 새로 띄운 별도 창이 가비지 컬렉션 되지 않도록 참조를 유지한다.
+    _extra_windows: list["CasaSerialWindow"] = []
+
+    def _window_for_new_session(self) -> "CasaSerialWindow":
+        """Window that should host a new session.
+
+        This window if it has no session yet; otherwise a new separate top-level window.
+        """
+        if not self.mdi_area.subWindowList():
+            return self
+
+        window = CasaSerialWindow()
+        window.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        CasaSerialWindow._extra_windows.append(window)
+        window.destroyed.connect(
+            lambda *_a, w=window: (
+                CasaSerialWindow._extra_windows.remove(w)
+                if w in CasaSerialWindow._extra_windows
+                else None
+            )
+        )
+        window.resize(self.size())
+        window.move(self.pos() + QPoint(40, 40))
+        window.show()
+        return window
+
+    # -- Bluetooth (Nordic UART Service) ------------------------------------
+
+    def _connected_ble_subwindows(self) -> list[MonitorSubWindow]:
+        return [
+            sub
+            for sub in self.mdi_area.subWindowList()
+            if isinstance(sub, MonitorSubWindow) and sub.is_ble and sub.is_connected
+        ]
+
+    def _sync_ble_button(self) -> None:
+        connected = bool(self._connected_ble_subwindows())
+        self.ble_button.setText("블루투스 연결종료" if connected else "블루투스 스캔")
+
+    def _on_ble_button_clicked(self) -> None:
+        connected = self._connected_ble_subwindows()
+        if connected:
+            for sub in connected:
+                sub.stop(wait=False)
+            self.statusBar().showMessage("블루투스 연결을 종료하는 중...", 3000)
+            return
+        self._open_ble_scan_dialog()
+
+    def _open_ble_scan_dialog(self) -> None:
+        dialog = BleScanDialog(parent=self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        selected = dialog.selected_device
+        if selected is None:
+            return
+
+        self._window_for_new_session()._start_ble_session(*selected)
+
+    def _start_ble_session(self, address: str, name: str) -> None:
+        settings = BleSettings(address=address, name=name)
+        sub = self._create_monitor_subwindow(
+            settings.port, dump_mode=True, cmd_key=settings.cmd_key
+        )
+        self._start_subwindow_connection(sub, ble_settings=settings)
+
     def _open_new_session_dialog(self) -> None:
         ports: list[tuple[str, str]] = []
         for i in range(self.port_combo.count()):
@@ -756,10 +956,23 @@ class CasaSerialWindow(QMainWindow):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
+        if dialog.connection_type == "bluetooth":
+            device = dialog.selected_device
+            if device is not None:
+                self._window_for_new_session()._start_ble_session(*device)
+            return
+
         selected_port = dialog.selected_port
         if not selected_port:
             return
 
+        self._window_for_new_session()._start_serial_session(
+            selected_port,
+            dump_mode=dialog.selected_visualizer == "Dump view",
+            start_now=dialog.start_now,
+        )
+
+    def _start_serial_session(self, selected_port: str, dump_mode: bool, start_now: bool) -> None:
         # Update port combo to selected port
         for i in range(self.port_combo.count()):
             if self.port_combo.itemData(i) == selected_port:
@@ -768,19 +981,11 @@ class CasaSerialWindow(QMainWindow):
 
         # Build title and create subwindow
         port_label = self.port_combo.currentText()
-        dump_mode = dialog.selected_visualizer == "Dump view"
-        sub = MonitorSubWindow(port_label, dump_mode=dump_mode, parent=self)
-        sub.log_format = self.log_format_combo.currentText()
-        sub.timestamp_enabled = self.timestamp_checkbox.isChecked()
-        sub.state_changed.connect(self._on_subwindow_state_changed)
-        sub.error_occurred.connect(self._on_subwindow_error)
-        sub.bytes_sent.connect(self._on_subwindow_bytes_sent)
+        sub = self._create_monitor_subwindow(
+            port_label, dump_mode, cmd_key=f"serial:{selected_port}"
+        )
 
-        self.mdi_area.addSubWindow(sub)
-        sub.show()
-        self.mdi_area.setActiveSubWindow(sub)
-
-        if dialog.start_now:
+        if start_now:
             settings = self.current_serial_settings()
             if settings:
                 sub.start(settings)
@@ -802,8 +1007,15 @@ class CasaSerialWindow(QMainWindow):
         else:
             self._start_subwindow_connection(sub)
 
-    def _start_subwindow_connection(self, sub: MonitorSubWindow) -> None:
-        settings = self.current_serial_settings()
+    def _start_subwindow_connection(
+        self, sub: MonitorSubWindow, ble_settings: BleSettings | None = None
+    ) -> None:
+        if ble_settings is not None:
+            settings: SerialSettings | BleSettings | None = ble_settings
+        elif sub.is_ble:
+            settings = sub.current_settings  # reconnect to the same BLE device
+        else:
+            settings = self.current_serial_settings()
         if settings is None:
             return
         self.connection_status_label.setText("연결 중")
@@ -1227,6 +1439,9 @@ class CasaSerialWindow(QMainWindow):
                 self.connection_status_label.text() != "닫는 중"
             )
             return
+        if sub is not None and sub.is_ble:
+            self.open_button.setEnabled(True)
+            return
         self.open_button.setEnabled(
             self._active_subwindow() is not None
             and self.port_combo.currentData() is not None
@@ -1235,6 +1450,7 @@ class CasaSerialWindow(QMainWindow):
     # -- close --------------------------------------------------------------
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        self._save_cmd_entries()
         for sub in list(self.mdi_area.subWindowList()):
             if isinstance(sub, MonitorSubWindow):
                 sub.stop(wait=True)

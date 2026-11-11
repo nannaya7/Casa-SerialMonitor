@@ -30,7 +30,11 @@ def main() -> int:
         str(resource_path(Path("Fonts") / "D2Coding-Ver1.3.2-20180524-all.ttc"))
     )
     # 글자 또렷함: 전체 힌팅 + 안티앨리어싱을 명시한다.
+    # 한글 글꼴: 나눔스퀘어 (영문/숫자는 Inter, 한글은 NanumSquare로 대체 표시)
+    for name in ("NanumSquareL", "NanumSquareR", "NanumSquareB", "NanumSquareEB"):
+        QFontDatabase.addApplicationFont(str(resource_path(Path("Fonts") / f"{name}.ttf")))
     base_font = QFont("Inter", 10)
+    base_font.setFamilies(["Inter", "NanumSquare"])
     base_font.setHintingPreference(QFont.HintingPreference.PreferFullHinting)
     base_font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
     app.setFont(base_font)

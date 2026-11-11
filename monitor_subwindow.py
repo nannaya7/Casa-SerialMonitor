@@ -16,8 +16,9 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QMdiSubWindow, QPlainTextEdit, QWidget
 
+from ble_worker import BleWorker
 from serial_worker import SerialWorker
-from settings import SerialSettings
+from settings import BleSettings, SerialSettings
 
 
 class MonitorSubWindow(QMdiSubWindow):
@@ -37,9 +38,16 @@ class MonitorSubWindow(QMdiSubWindow):
     def __init__(self, title: str, dump_mode: bool = False, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        self._worker: SerialWorker | None = None
+        # 최대화 상태에서 메뉴바 오른쪽/왼쪽에 최소화·복원·닫기 버튼과 시스템 메뉴 아이콘이
+        # 나타나지 않도록 창 버튼 힌트를 제거한다. (세션 닫기는 세션 메뉴의 Ctrl+W)
+        self.setWindowFlags(
+            Qt.WindowType.SubWindow
+            | Qt.WindowType.CustomizeWindowHint
+            | Qt.WindowType.WindowTitleHint
+        )
+        self._worker: SerialWorker | BleWorker | None = None
         self._worker_factory = SerialWorker
-        self._current_settings: SerialSettings | None = None
+        self._current_settings: SerialSettings | BleSettings | None = None
         self._rx_bytes = 0
         self._tx_bytes = 0
         self._rx_buffer = bytearray()
@@ -47,6 +55,8 @@ class MonitorSubWindow(QMdiSubWindow):
         self._timestamp_enabled = False
         self._dump_mode = dump_mode
         self._file_backed = False
+        # CMD 전송 데이터를 저장/복원할 대상 키. 연결 설정이 정해지면 그 설정의 키를 우선한다.
+        self.initial_cmd_key: str | None = None
 
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
@@ -80,8 +90,19 @@ class MonitorSubWindow(QMdiSubWindow):
         return self._worker is not None
 
     @property
-    def current_settings(self) -> SerialSettings | None:
+    def current_settings(self) -> SerialSettings | BleSettings | None:
         return self._current_settings
+
+    @property
+    def cmd_key(self) -> str | None:
+        settings = self._current_settings
+        if settings is not None:
+            return settings.cmd_key
+        return self.initial_cmd_key
+
+    @property
+    def is_ble(self) -> bool:
+        return isinstance(self._current_settings, BleSettings)
 
     @property
     def rx_bytes(self) -> int:
@@ -113,16 +134,19 @@ class MonitorSubWindow(QMdiSubWindow):
     def timestamp_enabled(self, enabled: bool) -> None:
         self._timestamp_enabled = enabled
 
-    def start(self, settings: SerialSettings) -> None:
+    def start(self, settings: SerialSettings | BleSettings) -> None:
         if self._worker is not None:
             return
         self._current_settings = settings
         self._rx_bytes = 0
         self._tx_bytes = 0
         self._rx_buffer.clear()
-        self._append("SESSION", f"{settings.port} 연결 시도 중 ({settings.baudrate} baud)")
-
-        worker = self._worker_factory(settings, parent=self)
+        if isinstance(settings, BleSettings):
+            self._append("SESSION", f"{settings.port} 블루투스 연결 시도 중 (Nordic UART)")
+            worker = BleWorker(settings, parent=self)
+        else:
+            self._append("SESSION", f"{settings.port} 연결 시도 중 ({settings.baudrate} baud)")
+            worker = self._worker_factory(settings, parent=self)
         worker.data_received.connect(self._on_data_received)
         worker.bytes_written.connect(self._on_bytes_written)
         if self._dump_mode:
@@ -192,8 +216,11 @@ class MonitorSubWindow(QMdiSubWindow):
 
     def _on_port_opened(self, port: str) -> None:
         settings = self._current_settings
-        baud = settings.baudrate if settings else "?"
-        self.setWindowTitle(f"{port} - {baud} [연결됨]")
+        if isinstance(settings, BleSettings):
+            self.setWindowTitle(f"{port} [BLE 연결됨]")
+        else:
+            baud = settings.baudrate if settings else "?"
+            self.setWindowTitle(f"{port} - {baud} [연결됨]")
         self._append("SESSION", f"{port} 연결됨")
         self.state_changed.emit(self)
 
@@ -205,7 +232,9 @@ class MonitorSubWindow(QMdiSubWindow):
             return
         self._worker = None
         settings = self._current_settings
-        if settings:
+        if isinstance(settings, BleSettings):
+            self.setWindowTitle(f"{settings.port} [BLE]")
+        elif settings:
             self.setWindowTitle(f"{settings.port} - {settings.baudrate}")
         self.state_changed.emit(self)
         worker.deleteLater()
