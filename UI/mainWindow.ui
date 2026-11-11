@@ -821,6 +821,7 @@ QLabel {
     color: #5b4736;
     min-height: 20px;
 }
+QLabel:disabled { color: #bfae9b; }
 QPushButton {
     min-height: 30px;
     padding: 4px 14px;
@@ -845,6 +846,11 @@ QComboBox, QLineEdit, QSpinBox {
 QComboBox:focus, QLineEdit:focus, QSpinBox:focus {
     border-color: #b98552;
     background: #ffffff;
+}
+QComboBox:disabled {
+    color: #b8a58f;
+    background: #fbf8f3;
+    border-color: #eee5da;
 }
 QComboBox::drop-down {
     border: none;

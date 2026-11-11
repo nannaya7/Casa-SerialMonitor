@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QFileDialog,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -240,6 +241,8 @@ class CasaSerialWindow(QMainWindow):
         ):
             self.format_group.addButton(radio)
 
+        self._build_ble_status_label()
+
         self._cmd_grid = self.cmd_grid
         self._cmd_add_btn = self.cmd_add_btn
         self._cmd_remove_btn = self.cmd_remove_btn
@@ -288,6 +291,24 @@ class CasaSerialWindow(QMainWindow):
             self._cmd_entries.append((inp, bin_cb, crlf_cb))
         self._update_cmd_pm_buttons()
         self._sync_ble_button()
+
+    def _build_ble_status_label(self) -> None:
+        """'전송 설정' 제목 옆에 블루투스 연결 상태 라벨을 둔다."""
+        self.ble_status_label = QLabel("", self.send_panel)
+        self.ble_status_label.setObjectName("ble_status_label")
+        self.ble_status_label.setStyleSheet(
+            "color: #8a5d33; font-size: 10pt; min-height: 26px; max-height: 26px;"
+        )
+        self.ble_status_label.hide()
+
+        self.send_panel_layout.removeWidget(self.panel_title)
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title_row.setSpacing(14)
+        title_row.addWidget(self.panel_title)
+        title_row.addWidget(self.ble_status_label)
+        title_row.addStretch(1)
+        self.send_panel_layout.insertLayout(0, title_row)
 
     # -- shared UI helpers ---------------------------------------------------
 
@@ -724,6 +745,7 @@ class CasaSerialWindow(QMainWindow):
     def _on_active_subwindow_changed(self, sub: QMdiSubWindow | None) -> None:
         self._sync_cmd_target()
         if not isinstance(sub, MonitorSubWindow):
+            self._set_connection_controls_enabled(True)
             self.connection_status_label.setText("연결 해제됨")
             self.port_status_label.setText("포트: -")
             self.rx_status_label.setText("RX: 0 bytes")
@@ -1420,6 +1442,9 @@ class CasaSerialWindow(QMainWindow):
     # -- UI state helpers ---------------------------------------------------
 
     def _set_connection_controls_enabled(self, enabled: bool) -> None:
+        # 블루투스 세션에서는 시리얼 설정(포트, 보드레이트 등)이 의미 없으므로 항상 흐리게 둔다.
+        sub = self._active_subwindow()
+        ble = sub is not None and sub.is_ble
         for widget in (
             self.port_combo,
             self.baudrate_combo,
@@ -1427,10 +1452,30 @@ class CasaSerialWindow(QMainWindow):
             self.parity_combo,
             self.flow_control_combo,
             self.stopbits_combo,
-            self.refresh_ports_action,
-            self.refresh_ports_button,
         ):
+            widget.setEnabled(enabled and not ble)
+        for label in (
+            self.port_label,
+            self.baudrate_label,
+            self.databits_label,
+            self.parity_label,
+            self.flow_control_label,
+            self.stopbits_label,
+        ):
+            label.setEnabled(not ble)
+        for widget in (self.refresh_ports_action, self.refresh_ports_button):
             widget.setEnabled(enabled)
+        self._update_ble_status_label(sub)
+
+    def _update_ble_status_label(self, sub: MonitorSubWindow | None) -> None:
+        if sub is None or not sub.is_ble:
+            self.ble_status_label.hide()
+            return
+        settings = sub.current_settings
+        name = (settings.name or settings.address) if settings else ""
+        state = "연결됨" if sub.is_connected else "연결 해제됨"
+        self.ble_status_label.setText(f"{name} {state}")
+        self.ble_status_label.show()
 
     def _sync_open_button_with_port_state(self) -> None:
         sub = self._active_subwindow()
