@@ -24,11 +24,12 @@ class NewSessionDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("New monitoring session")
         self.setModal(True)
-        self.setMinimumWidth(520)
+        self.setMinimumWidth(312)
         self._selected_port: str | None = None
         self._start_now = True
         self._selected_visualizer = "Dump view"
         self._build_ui(ports)
+        self.resize(312, self.sizeHint().height())
 
     @property
     def selected_port(self) -> str | None:
@@ -67,32 +68,19 @@ class NewSessionDialog(QDialog):
                 & ~Qt.ItemFlag.ItemIsEnabled
             )
             self.port_list.addItem(placeholder)
+        # 포트를 더블클릭하면 Start monitoring 버튼을 누른 것과 같이 바로 확정한다.
+        self.port_list.itemDoubleClicked.connect(lambda _item: self._on_accept())
         port_col.addWidget(self.port_list)
         top.addLayout(port_col, 1)
 
-        viz_col = QVBoxLayout()
-        viz_col.addWidget(QLabel("Choose desired visualizers:"))
-        self._viz_checkboxes: dict[str, QCheckBox] = {}
-        for text in ("Dump view", "Terminal view"):
-            checkbox = QCheckBox(text)
-            checkbox.setChecked(text == "Dump view")
-            checkbox.toggled.connect(self._on_viz_toggled)
-            self._viz_checkboxes[text] = checkbox
-            viz_col.addWidget(checkbox)
-        viz_col.addStretch()
-        top.addLayout(viz_col, 1)
         root.addLayout(top)
 
-        root.addWidget(QLabel("Note: you can select multiple ports"))
 
         session_group = QGroupBox("New session options")
         session_layout = QHBoxLayout(session_group)
         self.start_now_check = QCheckBox("Start monitoring now")
         self.start_now_check.setChecked(True)
-        new_window_check = QCheckBox("Start in new window")
-        new_window_check.setEnabled(False)
         session_layout.addWidget(self.start_now_check)
-        session_layout.addWidget(new_window_check)
         session_layout.addStretch()
         root.addWidget(session_group)
 
@@ -103,21 +91,9 @@ class NewSessionDialog(QDialog):
         button_box.rejected.connect(self.reject)
         root.addWidget(button_box)
 
-    def _on_viz_toggled(self, checked: bool) -> None:
-        sender = self.sender()
-        if not checked:
-            return
-        for checkbox in self._viz_checkboxes.values():
-            if checkbox is not sender:
-                checkbox.setChecked(False)
-
     def _on_accept(self) -> None:
         item = self.port_list.currentItem()
         if item:
             self._selected_port = item.data(Qt.ItemDataRole.UserRole)
         self._start_now = self.start_now_check.isChecked()
-        for text, checkbox in self._viz_checkboxes.items():
-            if checkbox.isChecked():
-                self._selected_visualizer = text
-                break
         self.accept()

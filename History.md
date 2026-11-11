@@ -1058,6 +1058,45 @@
 - `py_compile` 통과.
 - 오프스크린 실행: `port_scan_timer`가 더 이상 없고(`loop_send_timer`만 존재), 시작 시 포트 3개 스캔됨, 새로고침 버튼 수동 갱신 정상.
 
+## 2026-11-11 - New Session 다이얼로그 포트 더블클릭으로 바로 시작
+
+변경 파일:
+
+- `new_session_dialog.py`
+- `History.md`
+
+핵심 변경 사항:
+
+- 포트 목록 항목을 더블클릭하면 `Start monitoring` 버튼을 누른 것과 같이 `_on_accept()`가 호출되어 다이얼로그가 바로 확정된다.
+- 더블클릭한 항목이 선택 포트가 되고, 나머지 옵션(시각화 방식, Start monitoring now)은 현재 체크 상태를 그대로 따른다.
+- 포트가 없을 때의 "No serial ports detected" 항목은 비활성이라 더블클릭해도 동작하지 않는다.
+
+검증 결과:
+
+- `py_compile` 통과.
+- 오프스크린에서 두 번째 포트를 더블클릭 → 다이얼로그 Accepted(result=1), `selected_port=COM7`, `start_now=True` 확인. 포트가 없을 때도 오류 없이 표시됨.
+
+## 2026-11-11 - New Session 다이얼로그 정리
+
+변경 파일:
+
+- `new_session_dialog.py`
+- `History.md`
+
+핵심 변경 사항:
+
+- 오른쪽의 "Choose desired visualizers"(Dump view / Terminal view 체크박스) 영역을 제거했다.
+- "Start in new window" 체크박스(비활성 상태였음)를 제거했다.
+- 시각화 방식은 기존 기본값인 Dump view로 고정된다. (`selected_visualizer`는 `"Dump view"` 유지, 로그 형식이 String이면 HEX 없이 출력되는 동작은 그대로)
+- 포트 목록이 다이얼로그 전체 폭을 사용한다.
+- "Note: you can select multiple ports" 안내 문구도 제거했다.
+- 다이얼로그 가로 폭을 520px에서 312px로 40% 줄였다. (`setMinimumWidth(312)` + 초기 `resize(312, ...)`)
+
+검증 결과:
+
+- `py_compile` 통과.
+- 오프스크린 실행: 다이얼로그 정상 표시, 포트 더블클릭 시 `selected_port`, `selected_visualizer == "Dump view"` 확인.
+
 ## 나중에 할 일
 
 ### 파일 송신 기능
