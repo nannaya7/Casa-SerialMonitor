@@ -29,7 +29,11 @@ def main() -> int:
     QFontDatabase.addApplicationFont(
         str(resource_path(Path("Fonts") / "D2Coding-Ver1.3.2-20180524-all.ttc"))
     )
-    app.setFont(QFont("Inter", 10))
+    # 글자 또렷함: 전체 힌팅 + 안티앨리어싱을 명시한다.
+    base_font = QFont("Inter", 10)
+    base_font.setHintingPreference(QFont.HintingPreference.PreferFullHinting)
+    base_font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
+    app.setFont(base_font)
 
     window = CasaSerialWindow()
     window.show()

@@ -299,7 +299,7 @@ class CasaSerialWindow(QMainWindow):
     _CMD_BTN_STYLE = """
         QPushButton {
             color: #3a2b1f;
-            font-weight: 600;
+            font-weight: 400;
             background: #f3e7da;
             border: 1px solid #d9c1aa;
             border-radius: 8px;
