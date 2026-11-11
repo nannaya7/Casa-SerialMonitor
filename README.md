@@ -2,7 +2,7 @@
 
 PyQt6와 pyserial 기반의 크로스 플랫폼 시리얼 포트 모니터입니다. Windows 10/11과 macOS를 지원합니다.
 
-![CasaSerial](Target_APP.png)
+![CasaSerial](CasaSerialMonitor.png)
 
 ## 주요 기능
 

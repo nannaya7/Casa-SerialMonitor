@@ -971,6 +971,22 @@
 
 - 오프스크린 렌더링으로 헤더 위치 확인.
 
+## 2026-11-11 - README 스크린샷 교체
+
+변경 파일:
+
+- `README.md`
+- `CasaSerialMonitor.png` (신규)
+- `History.md`
+
+핵심 변경 사항:
+
+- README의 스크린샷이 참고 제품(`Target_APP.png`)이던 것을 CasaSerial 실제 화면(`CasaSerialMonitor.png`)으로 교체했다.
+
+검증 결과:
+
+- 문서 작업이라 코드 검증은 해당 없음.
+
 ## 나중에 할 일
 
 ### 파일 송신 기능
