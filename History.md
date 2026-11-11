@@ -1020,6 +1020,26 @@
 - 스타일 값 변경 확인.
 - 사용자 실기기 확인: 정상 동작.
 
+## 2026-11-11 - 로그 형식에 따른 Dump view 출력 분기
+
+변경 파일:
+
+- `monitor_subwindow.py`
+- `History.md`
+
+핵심 변경 사항:
+
+- Dump view 세션에서 로그 형식이 `String`일 때 HEX 값 없이 문자열만 출력하도록 했다. (예: `[RX] AT+BATT,4.16V,96%
+`)
+- 로그 형식이 `Hex`일 때만 기존처럼 `HEX  |  ASCII` 형태로 출력한다.
+- Dec/Oct/Bin 형식은 해당 형식의 값만 출력한다.
+- RX/TX 모두 `_format_for_view()`를 통해 같은 규칙을 적용한다.
+
+검증 결과:
+
+- 오프스크린 검증: Dump view + String → `AT+BATT,4.16V,96%
+`, Dump view + Hex → `41 54 ... 0D 0A  |  AT+BATT,4.16V,96%..`, 일반 뷰 + Hex → HEX만 출력.
+
 ## 나중에 할 일
 
 ### 파일 송신 기능

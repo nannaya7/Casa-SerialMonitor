@@ -175,14 +175,11 @@ class MonitorSubWindow(QMdiSubWindow):
     def _on_data_received(self, data: bytes) -> None:
         self._rx_buffer.extend(data)
         self._rx_bytes += len(data)
-        if self._dump_mode:
-            self._append("RX", self._format_dump(data))
-        else:
-            self._append("RX", self._format_bytes(data))
+        self._append("RX", self._format_for_view(data))
         self.state_changed.emit(self)
 
     def _on_data_written(self, data: bytes) -> None:
-        self._append("TX", self._format_dump(data))
+        self._append("TX", self._format_for_view(data))
 
     def _on_bytes_written(self, count: int) -> None:
         self._tx_bytes += count
@@ -218,6 +215,13 @@ class MonitorSubWindow(QMdiSubWindow):
         hex_part = " ".join(f"{b:02X}" for b in data)
         ascii_part = "".join(chr(b) if 0x20 <= b < 0x7F else "." for b in data)
         return f"{hex_part}  |  {ascii_part}"
+
+    def _format_for_view(self, data: bytes) -> str:
+        # Dump view는 로그 형식이 Hex일 때만 "HEX | ASCII" 형태로 표시한다.
+        # String 등 다른 형식에서는 해당 형식의 값만 출력한다.
+        if self._dump_mode and self._log_format == "Hex":
+            return self._format_dump(data)
+        return self._format_bytes(data)
 
     def _format_bytes(self, data: bytes) -> str:
         mode = self._log_format
