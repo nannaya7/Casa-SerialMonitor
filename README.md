@@ -1,27 +1,117 @@
 # CasaSerial
 
-PyQt6와 pyserial 기반의 크로스 플랫폼 시리얼 포트 모니터입니다. Windows 10/11과 macOS를 지원합니다.
+시리얼 포트와 블루투스 LE(Nordic UART Service) 장치의 통신을 한 화면에서 모니터링하고 데이터를 보낼 수 있는 크로스 플랫폼 데스크톱 앱입니다. PyQt6, pyserial, bleak로 만들었고 Windows 10/11과 macOS를 대상으로 합니다.
 
 ![CasaSerial](CasaSerialMonitor.png)
 
+## 목차
+
+- [주요 기능](#주요-기능)
+- [화면 구성](#화면-구성)
+- [사용 방법](#사용-방법)
+- [단축키](#단축키)
+- [저장되는 설정](#저장되는-설정)
+- [요구 사항](#요구-사항)
+- [설치 및 실행](#설치-및-실행)
+- [빌드와 설치 파일 만들기](#빌드와-설치-파일-만들기)
+- [블루투스(BLE) 동작 방식](#블루투스ble-동작-방식)
+- [알려진 제한 사항](#알려진-제한-사항)
+- [프로젝트 구조](#프로젝트-구조)
+- [문서](#문서)
+- [로드맵](#로드맵)
+
 ## 주요 기능
 
-- **포트 스캔**: 시작할 때 사용 가능한 시리얼 포트를 검색하고, `새로고침` 버튼으로 다시 검색
-- **연결 설정**: Port, Baudrate, Databits, Parity, Flow control, Stopbits
-- **멀티 세션(MDI)**: New Session 다이얼로그의 `Serial` / `Bluetooth` 탭에서 포트 또는 BLE 장치를 골라 여러 세션을 동시에 모니터링
-- **송신**: String / Hex / Dec / Oct / Bin 포맷, 입력 유효성 검사 및 자동 포맷, CR+LF 옵션
-- **블루투스(BLE)**: 툴바의 `블루투스 스캔`으로 주변 장치를 검색하고(이름/주소 필터), Nordic UART Service(NUS) 장치에 연결. 연결되면 버튼이 `블루투스 연결종료`로 바뀜. 연결된 세션에서도 시리얼과 동일하게 송수신 가능
-- **반복 송신**: 주기적 자동 송신 (Start/Stop loop)
-- **CMD 패널**: 자주 쓰는 명령을 행 단위로 추가/삭제하며 관리
-- **로그 뷰**: RX/TX/ERR/SESSION 카테고리별 색상, Timestamp 표시, Dump view, 최대 5000라인
-- **UI**: 한국어, 웜 베이지 테마, 반응형 레이아웃
+### 연결
+
+- **시리얼 포트**: Port, Baudrate(9600 ~ 115200 선택, 직접 입력 가능), Data bits(5 ~ 8), Parity(No parity / Odd / Even / Mark / Space), Flow control(None / RTS/CTS / XON/XOFF), Stop bits(1 / 1.5 / 2)를 설정해 연결합니다.
+- **포트 검색**: 앱을 시작할 때 사용 가능한 포트를 검색하고, 툴바의 `새로고침` 버튼으로 다시 검색합니다. (자동으로 반복 검색하지 않습니다.)
+- **블루투스 LE**: 주변 BLE 장치를 스캔해 Nordic UART Service(NUS)를 지원하는 장치에 연결합니다. 연결한 뒤에는 시리얼과 같은 방식으로 송수신합니다.
+- **멀티 세션**: 여러 포트/장치를 동시에 연결해 각각 별도 세션으로 모니터링합니다. 세션이 이미 열려 있는 창에서 새 세션을 열면 별도의 창으로 열립니다.
+
+### 송신
+
+- **전송 형식**: String / Hex / Dec / Oct / Bin 중에서 고릅니다. 입력 내용은 형식에 맞는지 검사하고 자동으로 정리하며, 형식을 바꾸면 입력한 내용도 새 형식으로 변환합니다.
+- **CR+LF**: 체크하면 보내는 데이터 끝에 `\r\n`을 붙입니다.
+- **반복 전송**: 지정한 간격(1 ms ~ 3,600,000 ms)으로 같은 데이터를 계속 보냅니다.
+- **명령어 목록**: 자주 쓰는 명령어를 행마다 저장해 두고 `SEND` 버튼으로 바로 보냅니다. 행마다 HEX / CR+LF를 따로 지정하고, 행은 최대 20개까지 추가/삭제할 수 있습니다. 내용은 연결 대상(포트 또는 블루투스 장치)별로 따로 저장됩니다.
+
+### 수신 로그
+
+- **로그 형식**: String / Hex / Dec / Oct / Bin으로 표시하고, 타임스탬프를 켜고 끌 수 있습니다.
+- **Dump view**: 로그 형식이 `Hex`이면 `HEX 값  |  ASCII` 형태로 함께 보여 줍니다. `String`이면 HEX 없이 문자열만 표시합니다. (`\r`, `\n`, `\t`는 눈에 보이는 문자로 표시)
+- **색상 구분**: RX(파랑) / TX(초록) / SESSION(회색) / ERR(빨강)으로 구분하고, 로그는 최대 5,000줄까지 유지합니다.
+- **저장/열기**: 수신한 데이터를 16바이트씩 줄바꿈한 HEX 텍스트 파일(`.cas`)로 저장하고, 저장한 파일을 열어 다시 볼 수 있습니다. 열기는 저장된 파일을 세션 창으로 불러옵니다.
+
+### 화면
+
+- 한국어 화면, 웜 베이지 테마, 창 크기에 맞춰 늘어나는 레이아웃
+- 영문/숫자는 Inter, 한글은 나눔스퀘어, 로그는 D2Coding 폰트를 사용합니다.
+- 오른쪽 `명령어 목록` 패널은 가운데 작은 화살표 버튼으로 접고 펼 수 있습니다.
+
+## 화면 구성
+
+| 영역 | 설명 |
+| --- | --- |
+| 메뉴 | `세션`(포트 새로고침, 세션 닫기), `도움말`(이 앱에 관하여) |
+| 툴바 | `새창` 세션 추가, `열기` 저장한 로그 열기, `저장` 수신 데이터 저장, `지우기` 로그 지우기, `새로고침` 포트 다시 검색, `스캔` 블루투스 스캔 |
+| 수신 데이터 | 세션별 로그 창, 위쪽에서 로그 형식과 타임스탬프 지정 |
+| 명령어 목록 | `SEND` 버튼, 전송 데이터, HEX / CR+LF 지정 |
+| 전송 설정 | 포트와 시리얼 설정, 오른쪽의 연결 열기/닫기 버튼 |
+| 전송 | 명령 입력창, 전송 형식, CR+LF, 반복 전송 |
+| 상태 표시줄 | 연결 상태, 포트(또는 블루투스 장치), RX/TX 바이트 수 |
+
+툴바의 `시작`, `일시정지`, `정지` 버튼은 자리만 있고 아직 동작하지 않습니다. (비활성 상태)
+
+## 사용 방법
+
+### 시리얼 포트로 연결
+
+1. 앱을 시작하면 `New monitoring session` 창이 자동으로 열립니다. (툴바의 `새창`으로도 열 수 있습니다.)
+2. `Serial` 탭에서 포트를 고르고 `Start monitoring`을 누릅니다. 포트를 더블클릭해도 같습니다.
+3. `Start monitoring now`가 체크돼 있으면 세션을 만들면서 바로 연결합니다. 체크를 풀었다면 아래 `전송 설정`에서 보드레이트 등을 바꾼 뒤 오른쪽의 연결 버튼(`열 기`)을 눌러 연결합니다.
+4. 수신한 데이터는 로그 창에 표시됩니다. 아래 전송 영역에서 명령을 입력하고 `전송`(또는 Enter)을 누르면 보냅니다.
+
+### 블루투스(BLE)로 연결
+
+1. 툴바의 `스캔` 버튼을 누르거나, `New monitoring session` 창의 `Bluetooth` 탭을 엽니다. 창이 열려 있는 동안 주변 장치를 계속 검색합니다.
+2. 필터 입력창에 장치 이름이나 주소의 일부를 적어 목록을 줄입니다. 이름이 없는 장치는 `(이름 없음)`으로 표시됩니다.
+3. 장치를 선택하고 `연결`(또는 더블클릭)을 누릅니다. 연결되면 새 세션 창이 열립니다.
+4. 블루투스 세션에서는 `전송 설정`의 시리얼 항목이 흐리게 표시되고, 제목 옆에 `기기명 연결됨`(이름이 없으면 BD 주소)이 나옵니다.
+5. 툴바의 블루투스 버튼이 `연결종료`로 바뀝니다. 누르면 연결을 끊습니다. 끊긴 세션은 `전송 설정` 오른쪽의 연결 버튼으로 같은 장치에 다시 연결할 수 있습니다.
+
+### 여러 세션 / 별도 창
+
+- 세션이 하나도 없는 창에서 세션을 열면 그 창에 열리고, 창을 꽉 채워 보여 줍니다.
+- 세션이 이미 있는 창에서 `새창`이나 `스캔`으로 새 세션을 열면 **새 창**이 추가로 열립니다. 새 창에도 같은 툴바, 전송 영역, 명령어 목록이 있어 각 창에서 독립적으로 송수신합니다.
+- 같은 시리얼 포트는 한 번에 한 곳에서만 열 수 있습니다. (운영체제 제한)
+
+### 명령어 목록 사용
+
+- 전송 데이터를 입력하고 `SEND`를 누르면 현재 선택된 세션으로 보냅니다. `HEX`를 체크하면 `41 54`처럼 HEX 값으로 입력하고, `CR+LF`를 체크하면 끝에 `\r\n`을 붙입니다.
+- 목록은 연결 대상별로 따로 저장됩니다. 포트는 포트 이름(예: `COM7`), 블루투스는 장치 이름(이름이 없으면 주소) 기준입니다. 세션을 바꾸면 그 대상의 목록으로 바뀌고, 처음 연결하는 대상은 빈 목록(10행)으로 시작합니다.
+- `추가`, `삭제`로 행을 늘리거나 줄입니다. (1 ~ 20행)
+
+## 단축키
+
+| 키 | 동작 |
+| --- | --- |
+| `Ctrl+W` | 현재 세션 닫기 (연결 중이면 연결을 끊고 닫음) |
+| `Ctrl+X` | 로그 창에서 로그 지우기 |
+
+## 저장되는 설정
+
+- 명령어 목록(전송 데이터, HEX / CR+LF 지정, 행 수)을 연결 대상별로 저장합니다. 앱을 닫을 때, `SEND`로 전송에 성공했을 때, 다른 세션으로 전환할 때 저장합니다.
+- 저장 위치: Windows는 레지스트리 `HKEY_CURRENT_USER\Software\CasaSerial\CasaSerial`, macOS는 사용자 환경설정(plist)입니다.
+- 여러 창에서 같은 대상을 동시에 쓰면 마지막으로 저장한 창의 내용이 남습니다.
 
 ## 요구 사항
 
-- Python 3.10 이상
+- Python 3.10 이상 (3.11에서 개발하고 확인했습니다)
 - PyQt6 >= 6.6
 - pyserial >= 3.5
 - bleak >= 0.22 (블루투스 LE)
+- 블루투스를 쓰려면 블루투스 어댑터가 있어야 하며, 운영체제에서 블루투스가 켜져 있어야 합니다.
 
 ## 설치 및 실행
 
@@ -30,43 +120,86 @@ pip install -r requirements.txt
 python main.py
 ```
 
-- Windows: `run.bat` 실행 (`.venv`가 있으면 자동 사용)
+- Windows: `run.bat`을 실행합니다. 가상환경(`.venv`)이 있으면 자동으로 사용하고, 터미널 창 없이 앱만 실행합니다. 오류 메시지를 보려면 `run.bat --console`로 실행합니다.
 - macOS: `./run_mac.sh`
 
-## 빌드 (PyInstaller)
+## 빌드와 설치 파일 만들기
 
-| 플랫폼 | 명령 | 결과 |
+빌드 결과는 모두 `WIN`(Windows) 또는 `MAC`(macOS) 폴더 아래에 만들어지며, 이 폴더는 Git에 올라가지 않습니다.
+
+| 목적 | 명령 | 결과 |
 | --- | --- | --- |
-| Windows | `.\build_win.bat` | `WIN\CasaSerial\CasaSerial.exe` |
-| Windows 설치 파일 | `.\build_setup.bat` (Inno Setup 필요) | `WIN\Setup\CasaSerial_Setup_<버전>.exe` |
-| macOS | `./build_mac.sh` | `MAC/CasaSerial.app` |
+| Windows 실행 파일 | `.\build_win.bat` | `WIN\CasaSerial\CasaSerial.exe` |
+| Windows 설치 파일 | `.\build_setup.bat [버전]` | `WIN\Setup\CasaSerial_Setup_<버전>.exe` |
+| macOS 앱 | `./build_mac.sh` | `MAC/CasaSerial.app` |
+
+- 필요한 도구: PyInstaller(`pip install pyinstaller`), 설치 파일은 [Inno Setup 6](https://jrsoftware.org/isdl.php)
+- 설치 파일은 관리자 권한 없이 사용자 폴더(`%LOCALAPPDATA%\Programs\CasaSerial`)에 설치하며, 시작 메뉴 바로가기와 제거 항목을 만듭니다. 바탕화면 아이콘은 설치 중에 선택합니다. 한국어/영어를 지원합니다.
+- `build_setup.bat 0.01.211`처럼 버전을 지정할 수 있고, `--skip-build`를 붙이면 이미 만든 앱을 다시 쓰고 설치 파일만 만듭니다.
+- 버전을 올릴 때는 `app_resources.py`의 `APP_VERSION`과 `installer/CasaSerial.iss`의 기본 버전을 함께 바꿉니다. (`이 앱에 관하여`에 표시되는 버전입니다.)
+- macOS 빌드 스크립트는 블루투스 사용 목적 문구를 앱 `Info.plist`에 넣고 다시 서명합니다.
 
 자세한 내용은 [packaging.md](packaging.md)를 참고하세요.
 
-## 파일 구조
+## 블루투스(BLE) 동작 방식
 
-| 파일 | 설명 |
-| --- | --- |
-| `main.py` | 앱 진입점 |
-| `main_window.py` | 메인 윈도우 (UI, 포트 스캔, 설정 매핑, 이벤트 처리) |
-| `monitor_subwindow.py` | 세션별 MDI 모니터 서브 윈도우 |
-| `new_session_dialog.py` | New Session 다이얼로그 |
-| `serial_worker.py` | `QThread` 기반 시리얼 I/O 워커 |
-| `ble_worker.py` | BLE(Nordic UART) 연결 워커와 장치 스캐너 |
-| `ble_scan_dialog.py` | 블루투스 스캔 다이얼로그 (필터, 장치 목록, 연결) |
-| `settings.py` | `SerialSettings` 데이터클래스 |
-| `app_resources.py` | 리소스 경로 처리 |
-| `UI/`, `image/`, `Fonts/` | UI 파일, 이미지, 폰트 |
+- **지원하는 서비스**: Nordic UART Service(NUS) 하나입니다.
+
+  | 항목 | UUID | 방향 |
+  | --- | --- | --- |
+  | Service | `6E400001-B5A3-F393-E0A9-E50E24DCCA9E` | |
+  | RX 특성 | `6E400002-B5A3-F393-E0A9-E50E24DCCA9E` | 앱 → 장치 (쓰기) |
+  | TX 특성 | `6E400003-B5A3-F393-E0A9-E50E24DCCA9E` | 장치 → 앱 (notify) |
+
+- **수신**: TX 특성의 notify로 들어오는 데이터를 약 10 ms 동안 모아서 한 번에 로그에 표시합니다.
+- **송신**: 데이터를 MTU에 맞게 나눠서 RX 특성에 씁니다. 전송이 끝나면 TX 바이트 수가 늘어납니다.
+- **오류 처리**: 장치에 NUS가 없거나, 연결에 실패하거나, 연결이 끊어지면 세션 로그와 상태 표시줄에 메시지를 보여 줍니다.
+- 스캔은 NUS를 광고하는 장치만 걸러서 보여 주지 않고, 주변에서 보이는 BLE 장치를 모두 보여 줍니다. NUS를 지원하는 장치인지는 연결할 때 확인합니다.
+
+## 알려진 제한 사항
+
+- 툴바의 `시작`, `일시정지`, `정지` 버튼은 아직 동작하지 않습니다.
+- 파일을 선택해서 보내는 기능은 아직 없습니다.
+- 블루투스는 Nordic UART Service만 지원합니다.
+- macOS용 빌드와 블루투스 동작은 이 저장소의 개발 환경(Windows)에서 확인하지 못했습니다.
+- 설치 파일에 코드 서명이 없어서, 다른 PC에서 실행하면 Windows SmartScreen 경고가 뜰 수 있습니다.
+
+## 프로젝트 구조
+
+```text
+.
+├─ main.py                  앱 진입점 (폰트 등록, 첫 세션 창 열기)
+├─ main_window.py           메인 창: UI, 포트 검색, 세션 관리, 송신, 명령어 목록
+├─ monitor_subwindow.py     세션별 로그 창 (MDI 서브 창)
+├─ new_session_dialog.py    New Session 창 (Serial / Bluetooth 탭)
+├─ ble_scan_dialog.py       블루투스 스캔 패널과 스캔 창
+├─ serial_worker.py         QThread 기반 시리얼 I/O 워커
+├─ ble_worker.py            BLE(NUS) 연결 워커와 장치 스캐너
+├─ settings.py              SerialSettings, BleSettings
+├─ app_resources.py         리소스 경로, 앱 이름과 버전
+├─ UI/mainWindow.ui         메인 창 레이아웃
+├─ image/                   앱 아이콘, 버튼 이미지(buttons), 아이콘(icons)
+├─ Fonts/                   Inter, 나눔스퀘어, D2Coding
+├─ installer/CasaSerial.iss Inno Setup 스크립트
+├─ build_win.bat            Windows 실행 파일 빌드
+├─ build_setup.bat          Windows 설치 파일 빌드
+├─ build_mac.sh             macOS 앱 빌드
+├─ run.bat, run_mac.sh      실행 스크립트
+└─ requirements.txt         의존 패키지
+```
+
+시리얼과 블루투스 워커는 같은 시그널/메서드(`data_received`, `bytes_written`, `error_occurred`, `port_opened`, `port_closed`, `write_data`, `stop` 등)를 제공해서, 세션 창이 연결 종류와 상관없이 같은 방식으로 사용합니다.
 
 ## 문서
 
-- [History.md](History.md): 개발 이력 (작업 내용 지속 기록)
+- [History.md](History.md): 개발 이력. 작업 내용을 계속 기록합니다.
 - [packaging.md](packaging.md): 패키징 가이드
 - [memory.md](memory.md): 작업 재개용 메모
+- [CLAUDE.md](CLAUDE.md): 이 저장소의 작업 규칙 (커밋 형식, 기록 규칙)
 
 ## 로드맵
 
-- 파일 송신 기능 (`QFileDialog`, chunk 단위 송신)
+- 파일 송신 기능 (파일 선택, 큰 파일은 나눠서 전송해 화면이 멈추지 않게)
 - Bridge 모드 (가상 포트 기반 소프트웨어 시리얼 프록시)
 
 자세한 계획은 [History.md](History.md)의 "나중에 할 일"을 참고하세요.
