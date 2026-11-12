@@ -6,7 +6,7 @@ PyQt6와 pyserial 기반의 크로스 플랫폼 시리얼 포트 모니터입니
 
 ## 주요 기능
 
-- **포트 스캔**: 사용 가능한 시리얼 포트를 2초 간격으로 자동 갱신
+- **포트 스캔**: 시작할 때 사용 가능한 시리얼 포트를 검색하고, `새로고침` 버튼으로 다시 검색
 - **연결 설정**: Port, Baudrate, Databits, Parity, Flow control, Stopbits
 - **멀티 세션(MDI)**: New Session 다이얼로그의 `Serial` / `Bluetooth` 탭에서 포트 또는 BLE 장치를 골라 여러 세션을 동시에 모니터링
 - **송신**: String / Hex / Dec / Oct / Bin 포맷, 입력 유효성 검사 및 자동 포맷, CR+LF 옵션
@@ -38,6 +38,7 @@ python main.py
 | 플랫폼 | 명령 | 결과 |
 | --- | --- | --- |
 | Windows | `.\build_win.bat` | `WIN\CasaSerial\CasaSerial.exe` |
+| Windows 설치 파일 | `.\build_setup.bat` (Inno Setup 필요) | `WIN\Setup\CasaSerial_Setup_<버전>.exe` |
 | macOS | `./build_mac.sh` | `MAC/CasaSerial.app` |
 
 자세한 내용은 [packaging.md](packaging.md)를 참고하세요.

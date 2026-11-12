@@ -61,3 +61,20 @@ macOS 빌드 중간 산출물은 `MAC/build`, `MAC/spec`, `MAC/icon` 아래에 �
 - Windows 패키지는 Windows에서, macOS 패키지는 macOS에서 각각 생성한다.
 - 실제 시리얼 장치 연결, 포트 열기 실패, USB 제거, 송신/반복 송신은 패키징 후에도 다시 확인한다.
 - 코드 서명, notarization, 설치 프로그램 생성은 기본 기능 검증이 끝난 뒤 별도 단계로 진행한다.
+
+
+## Windows 설치 파일(setup.exe)
+
+Inno Setup 6이 필요하다. (https://jrsoftware.org/isdl.php)
+
+```powershell
+.uild_setup.bat 0.01.202
+```
+
+- 앱을 PyInstaller로 빌드(`build_win.bat`)한 뒤 `installer\CasaSerial.iss`로 설치 파일을 만든다.
+- 버전을 생략하면 `.iss`에 적힌 기본값을 쓴다. 이미 빌드한 앱을 재사용하려면 `--skip-build`를 붙인다.
+- 빌드 결과는 모두 `WIN` 폴더 아래에 생성된다.
+  - 앱: `WIN\CasaSerial\CasaSerial.exe`
+  - 설치 파일: `WIN\Setup\CasaSerial_Setup_<버전>.exe`
+  - 중간 파일: `WINuild`, `WIN\spec`
+- 설치 파일은 기본적으로 관리자 권한 없이 사용자 폴더(`%LOCALAPPDATA%\Programs\CasaSerial`)에 설치하며, 시작 메뉴 바로가기와 제거 항목(앱 및 기능)을 만든다. 바탕화면 아이콘은 설치 중 선택할 수 있다. 설치 언어는 한국어/영어.

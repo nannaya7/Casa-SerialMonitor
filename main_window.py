@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMdiSubWindow,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
     QWidget,
@@ -36,6 +37,7 @@ from serial.tools import list_ports
 
 from app_resources import (
     APP_NAME,
+    APP_VERSION,
     BUTTONS_RELATIVE_PATH,
     ICON_RELATIVE_PATH,
     MAIN_WINDOW_UI_RELATIVE_PATH,
@@ -50,6 +52,14 @@ from settings import BleSettings, SerialSettings
 # ---------------------------------------------------------------------------
 # Main window
 # ---------------------------------------------------------------------------
+
+# 툴바 이미지 버튼(새로고침, 블루투스)의 크기. 이미지 원본(1120x580)의 가로세로 비율에 맞춘다.
+TOOLBAR_IMAGE_BUTTON_SIZE = QSize(112, 58)
+CMD_SEND_IMAGE = "SEND"
+CMD_SEND_BUTTON_SIZE = QSize(67, 38)  # SEND.png(718x418)의 가로세로 비율
+BLE_SCAN_IMAGE = "BT_SCAN.png"
+BLE_DISCONNECT_IMAGE = "BT_DISCONNECT.png"
+
 
 class CasaSerialWindow(QMainWindow):
     """Main window for the cross-platform serial monitor."""
@@ -72,6 +82,9 @@ class CasaSerialWindow(QMainWindow):
         self.close_session_action.setShortcut(QKeySequence("Ctrl+W"))
         self.close_session_action.triggered.connect(self.mdi_area.closeActiveSubWindow)
         self.session_menu.addAction(self.close_session_action)
+        self.about_action = QAction("이 앱에 관하여", self)
+        self.about_action.triggered.connect(self._show_about)
+        self.help_menu.addAction(self.about_action)
         self.save_action.triggered.connect(self._save_active_received_data)
         self.refresh_ports_action.triggered.connect(
             lambda: self.refresh_ports(show_status=True, force=True)
@@ -136,7 +149,7 @@ class CasaSerialWindow(QMainWindow):
         )
         self.refresh_ports_button = QPushButton(self.main_toolbar)
         self.refresh_ports_button.setObjectName("refresh_ports_button")
-        self.refresh_ports_button.setFixedSize(138, 58)
+        self.refresh_ports_button.setFixedSize(TOOLBAR_IMAGE_BUTTON_SIZE)
         self.refresh_ports_button.setText("")
         self.refresh_ports_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.refresh_ports_button.clicked.connect(
@@ -158,28 +171,13 @@ class CasaSerialWindow(QMainWindow):
         )
         self.main_toolbar.addWidget(self.refresh_ports_button)
 
-        self.ble_button = QPushButton("블루투스 스캔", self.main_toolbar)
+        self.ble_button = QPushButton(self.main_toolbar)
         self.ble_button.setObjectName("ble_button")
-        self.ble_button.setFixedSize(150, 58)
+        self.ble_button.setFixedSize(TOOLBAR_IMAGE_BUTTON_SIZE)
+        self.ble_button.setText("")
+        self.ble_button.setToolTip("블루투스 스캔")
         self.ble_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.ble_button.setStyleSheet(
-            """
-            QPushButton#ble_button {
-                color: #3a2b1f;
-                background: #fffefa;
-                border: 1px solid #e6d9cc;
-                border-radius: 14px;
-                padding: 0 12px;
-            }
-            QPushButton#ble_button:hover {
-                background: #f3e7da;
-                border-color: #d9c1aa;
-            }
-            QPushButton#ble_button:pressed {
-                background: #ead8c4;
-            }
-            """
-        )
+        self._set_ble_button_image(connected=False)
         self.ble_button.clicked.connect(self._on_ble_button_clicked)
         self.main_toolbar.addWidget(self.ble_button)
 
@@ -277,8 +275,7 @@ class CasaSerialWindow(QMainWindow):
             inp = getattr(self, f"cmd_input_{i:02d}")
             bin_cb = getattr(self, f"cmd_bin_{i:02d}")
             crlf_cb = getattr(self, f"cmd_crlf_{i:02d}")
-            btn.setStyleSheet(self._CMD_BTN_STYLE)
-            btn.setToolTip(f"{i:02d}번 전송 데이터 보내기")
+            self._style_cmd_send_button(btn, i)
             inp.setMinimumHeight(34)
             btn.clicked.connect(lambda _checked=False, idx=i: self._send_cmd(idx))
             bin_cb.toggled.connect(
@@ -357,40 +354,20 @@ class CasaSerialWindow(QMainWindow):
 
     # -- command quick-send panel ------------------------------------------
 
-    _CMD_BTN_STYLE = """
-        QPushButton {
-            color: #3a2b1f;
-            font-weight: 400;
-            background: #f3e7da;
-            border: 1px solid #d9c1aa;
-            border-radius: 8px;
-            padding: 2px 8px;
-            min-height: 32px;
-        }
-        QPushButton:hover {
-            background: #ead8c4;
-            border-color: #b98552;
-            color: #6b4423;
-        }
-        QPushButton:pressed {
-            background: #d9bfa3;
-            border-color: #a87443;
-            padding-top: 4px;
-            padding-bottom: 0;
-        }
-        QPushButton:disabled {
-            color: #a89886;
-            background: #f7f1ea;
-            border-color: #e6d9cc;
-        }
-    """
+    def _style_cmd_send_button(self, btn: QPushButton, index: int) -> None:
+        """CMD 목록의 SEND 버튼: image/buttons/SEND.png 이미지 버튼 (원본 718x418 → 67x38)."""
+        self._apply_image_button(
+            btn,
+            CMD_SEND_IMAGE,
+            CMD_SEND_BUTTON_SIZE,
+            CMD_SEND_BUTTON_SIZE,
+            f"{index:02d}번 전송 데이터 보내기",
+        )
 
     def _append_cmd_row(self, i: int) -> None:
         r = i + 1
-        btn = QPushButton("SEND", self.cmd_content)
-        btn.setFlat(True)
-        btn.setStyleSheet(self._CMD_BTN_STYLE)
-        btn.setToolTip(f"{i:02d}번 전송 데이터 보내기")
+        btn = QPushButton(self.cmd_content)
+        self._style_cmd_send_button(btn, i)
         btn.clicked.connect(lambda _, idx=i: self._send_cmd(idx))
         inp = QLineEdit(self.cmd_content)
         inp.setMinimumHeight(34)
@@ -937,9 +914,27 @@ class CasaSerialWindow(QMainWindow):
             if isinstance(sub, MonitorSubWindow) and sub.is_ble and sub.is_connected
         ]
 
+    def _set_ble_button_image(self, connected: bool) -> None:
+        """BT_SCAN.png (idle) / BT_DISCONNECT.png (connected) as the button face."""
+        image = BLE_DISCONNECT_IMAGE if connected else BLE_SCAN_IMAGE
+        url = resource_path(BUTTONS_RELATIVE_PATH / image).as_posix()
+        self.ble_button.setStyleSheet(
+            f"""
+            QPushButton#ble_button {{
+                background: transparent;
+                border: none;
+                padding: 0;
+                margin: 0;
+                border-image: url("{url}") 0 0 0 0 stretch stretch;
+            }}
+            """
+        )
+        self.ble_button.setToolTip("블루투스 연결종료" if connected else "블루투스 스캔")
+        self.ble_button.setAccessibleName(self.ble_button.toolTip())
+
     def _sync_ble_button(self) -> None:
         connected = bool(self._connected_ble_subwindows())
-        self.ble_button.setText("블루투스 연결종료" if connected else "블루투스 스캔")
+        self._set_ble_button_image(connected)
 
     def _on_ble_button_clicked(self) -> None:
         connected = self._connected_ble_subwindows()
@@ -1490,6 +1485,19 @@ class CasaSerialWindow(QMainWindow):
         self.open_button.setEnabled(
             self._active_subwindow() is not None
             and self.port_combo.currentData() is not None
+        )
+
+    # -- about --------------------------------------------------------------
+
+    def _show_about(self) -> None:
+        QMessageBox.about(
+            self,
+            "이 앱에 관하여",
+            f"<h3>{APP_NAME}</h3>"
+            f"<p>버전 {APP_VERSION}</p>"
+            "<p>시리얼 포트와 블루투스 LE(Nordic UART Service) 장치의 통신을 "
+            "모니터링하고 데이터를 보낼 수 있는 크로스 플랫폼 앱입니다.</p>"
+            "<p>PyQt6 · pyserial · bleak</p>",
         )
 
     # -- close --------------------------------------------------------------

@@ -1381,18 +1381,12 @@ QMenu::item:selected {
     </property>
     <addaction name="refresh_ports_action"/>
    </widget>
-   <widget class="QMenu" name="view_menu">
-    <property name="title">
-     <string>보기</string>
-    </property>
-   </widget>
    <widget class="QMenu" name="help_menu">
     <property name="title">
      <string>도움말</string>
     </property>
    </widget>
    <addaction name="session_menu"/>
-   <addaction name="view_menu"/>
    <addaction name="help_menu"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
