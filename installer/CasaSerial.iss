@@ -2,7 +2,7 @@
 ; Build: build_setup.bat  (builds WIN\CasaSerial with PyInstaller, then compiles this script)
 
 #ifndef AppVersion
-  #define AppVersion "0.01.211"
+  #define AppVersion "0.01.212"
 #endif
 #define AppName "CasaSerial"
 #define AppExe "CasaSerial.exe"

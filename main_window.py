@@ -117,6 +117,7 @@ class CasaSerialWindow(QMainWindow):
         """Rebuild runtime-only relationships that are not represented in .ui."""
         self.mdi_area.setBackground(QColor("#fffdf9"))
         self.mdi_area.viewport().setStyleSheet("background: #fffdf9;")
+        self._apply_combo_arrow_style()
         self.h_splitter.setStretchFactor(0, 1)
         self.h_splitter.setStretchFactor(1, 0)
         self.h_splitter.setSizes([700, 300])
@@ -288,6 +289,28 @@ class CasaSerialWindow(QMainWindow):
             self._cmd_entries.append((inp, bin_cb, crlf_cb))
         self._update_cmd_pm_buttons()
         self._sync_ble_button()
+
+    def _apply_combo_arrow_style(self) -> None:
+        """전송 설정의 콤보박스에 아래쪽 화살표(▼)를 표시한다.
+
+        .ui 스타일시트가 `QComboBox::drop-down`을 직접 꾸미면 Qt가 기본 화살표를 그리지 않으므로,
+        `::down-arrow` 이미지를 따로 지정해야 한다.
+        """
+        normal = resource_path(BUTTONS_RELATIVE_PATH / "arrow_down.png").as_posix()
+        disabled = resource_path(BUTTONS_RELATIVE_PATH / "arrow_down_disabled.png").as_posix()
+        self.send_panel.setStyleSheet(
+            self.send_panel.styleSheet()
+            + f"""
+QComboBox::down-arrow {{
+    image: url("{normal}");
+    width: 10px;
+    height: 6px;
+}}
+QComboBox::down-arrow:disabled {{
+    image: url("{disabled}");
+}}
+"""
+        )
 
     def _build_ble_status_label(self) -> None:
         """'전송 설정' 제목 옆에 블루투스 연결 상태 라벨을 둔다."""
